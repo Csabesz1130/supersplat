@@ -82,6 +82,50 @@ To test your translations:
 
    Replace `<locale>` with your language code (e.g., `fr`, `de`, `es`).
 
+## Embedding the Editor (ActionNet host bridge)
+
+This fork adds an opt-in `postMessage` protocol that lets a host page (in
+particular `actionnet-ai`) drive the editor as a fully-managed iframe. The
+bridge is implemented additively in `src/actionnet/host-bridge.ts` and only
+activates when the iframe URL carries `?host=actionnet`. No other code paths
+change.
+
+**Activation URL**
+
+```
+https://superspl.at/editor?host=actionnet&sceneId=<uuid>&token=<jwt>
+```
+
+`token` and `sceneId` are optional and stored on `window.__actionnetHost` for
+the bridge to read at any time (no need to keep a URL listener alive).
+
+**Inbound (host → editor)** — namespace `supersplat:actionnet`, `cmd`:
+
+| `cmd`         | payload                                                              | effect                                                              |
+|---------------|----------------------------------------------------------------------|---------------------------------------------------------------------|
+| `load`        | `{ url, filename?, sceneId? }`                                       | Load a splat from a (signed) URL via the existing import pipeline   |
+| `save`        | `{ format: 'ply'\|'compressed_ply'\|'sog'\|'splat' }`                | Serialize the current scene; reply with `save-result`               |
+| `set-camera`  | `{ position, target, fov? }`                                         | Snap the camera to a pose                                           |
+| `headless`    | `{ ops: ProcessAction[] }`                                           | Apply a splat-transform-style op list with undo/redo                |
+| `set-theme`   | `{ theme: 'light' \| 'dark' }`                                       | Match host theme                                                    |
+| `set-locale`  | `{ lng: string }`                                                    | Set i18n language                                                   |
+| `ping`        | —                                                                    | Healthcheck; replies with `pong`                                    |
+
+**Outbound (editor → host)** — namespace `supersplat:actionnet`, `evt`:
+
+| `evt`            | payload                                                                  |
+|------------------|--------------------------------------------------------------------------|
+| `ready`          | —                                                                        |
+| `scene-loaded`   | `{ name, splatCount? }`                                                  |
+| `dirty-changed`  | `{ dirty }`                                                              |
+| `save-result`    | `{ format, bytesBase64, byteSize }`                                      |
+| `progress`       | `{ stage, percent, message? }`                                           |
+| `error`          | `{ code, message }`                                                      |
+| `pong`           | —                                                                        |
+
+Canonical type definitions live in `src/actionnet/protocol.ts`. The host side
+of the bridge (`SplatEditor.tsx`) lives in the `actionnet-ai` repo.
+
 ## Contributors
 
 SuperSplat is made possible by our amazing open source community:
