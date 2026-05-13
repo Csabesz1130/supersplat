@@ -44,6 +44,10 @@ declare global {
             setConsumer: (callback: (launchParams: LaunchParams) => void) => void;
         };
         scene: Scene;
+        // ActionNet integration: stashed by main() when ?host=actionnet is set.
+        // The host bridge (src/actionnet/host-bridge.ts) reads these to scope
+        // its load/save behavior.
+        __actionnetHost?: { host: string; token?: string; sceneId?: string };
     }
 }
 
@@ -73,7 +77,32 @@ const getURLArgs = () => {
     return config;
 };
 
+// Pick out the ActionNet host params (`?host=actionnet&token=...&sceneId=...`)
+// from the URL once at boot. We deliberately leave the params on
+// location.search so the existing `?load=` machinery below still sees them and
+// the host bridge can re-read them on demand. The values are mirrored onto
+// `window.__actionnetHost` for the bridge's reload-safe access.
+const captureActionNetHost = () => {
+    try {
+        const sp = new URLSearchParams(window.location.search);
+        const host = sp.get('host');
+        if (host === 'actionnet') {
+            window.__actionnetHost = {
+                host,
+                token: sp.get('token') ?? undefined,
+                sceneId: sp.get('sceneId') ?? undefined,
+            };
+        }
+    } catch {
+        // location.search may be inaccessible in some sandboxes; ignore.
+    }
+};
+
 const main = async () => {
+    // ActionNet embedding hook: detect host params before any other init so
+    // the iframe-api / host-bridge can rely on window.__actionnetHost.
+    captureActionNetHost();
+
     // root events object
     const events = new Events();
 

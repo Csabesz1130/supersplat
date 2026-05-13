@@ -1,4 +1,5 @@
 import { Events } from './events';
+import { installActionNetHostBridge } from './actionnet/host-bridge';
 
 const IS_SCENE_DIRTY = 'supersplat:is-scene-dirty';
 
@@ -34,6 +35,18 @@ const registerIframeApi = (events: Events) => {
             source.postMessage(response, event.origin);
         }
     });
+
+    // Opt-in ActionNet host bridge. The bridge is only attached when the page
+    // was opened with ?host=actionnet so non-ActionNet embeds keep the exact
+    // upstream behavior (only the IS_SCENE_DIRTY query above).
+    try {
+        const sp = new URLSearchParams(window.location.search);
+        if (sp.get('host') === 'actionnet') {
+            installActionNetHostBridge(events);
+        }
+    } catch {
+        // location.search may be inaccessible in some sandboxes; ignore.
+    }
 };
 
 export { registerIframeApi };
